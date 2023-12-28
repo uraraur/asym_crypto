@@ -4,8 +4,6 @@ import math
 from sympy.ntheory import jacobi_symbol
 import requests
 
-
-print("fsffwqaf")
 k = 10 #miller rabin moment
 l = 256 #довжина p ta q 
 
@@ -152,26 +150,26 @@ class User:
                 return unformat(self.n, s)
 
     def extend_decrypt(self, y, c1, c2):
-        sol = sq_blum((y + pow(self.b, 2, self.n) * pow(2, -2, self.n)) % self.n, self.p, self.q)
-        for s in sol: 
-            s = (s - self.b * pow(2, -1, self.n)) % self.n 
+        sol = sq_blum((y + pow(self.b, 2, self.n) * pow(4, -1, self.n)), self.p, self.q)
         for s in sol: 
             s_c1 = s % 2 
             s_c2 = int(jacobi_symbol(s, self.n) == 1)
             if s_c1 == c1 & s_c2 == c2:
+                s = (s - self.b * pow(2, -1, self.n)) % self.n 
                 return unformat(self.n, s)
     
     def sign(self, m):
-        x = format(self.n, m)
-        while (jacobi_symbol(x, self.p) != jacobi_symbol(x, self.q) != 1) :
-            x = format(self.n, m)    
-        return (m, sq_blum(x, self.p, self.q)[0])
+        while True:
+            x = format(self.n, m)
+            if (jacobi_symbol(x, self.p) == jacobi_symbol(x, self.q) == 1) :
+                break
+        return sq_blum(x, self.p, self.q)[random.randint(0, 3)]
         
-    def verify(self, s, m):
-        tx = pow(s, 2, self.n)
-        if unformat(self.n, tx) != m:
+    def verify(self, s, m, n):
+        tx = pow(s, 2, n)
+        if unformat(n, tx) != m:
             print(":(")
-        print("Success")
+        return "Success"
     
 #--------------------------------------------------------------------------------------------
 
@@ -197,5 +195,13 @@ s_y = int(encrypt.json()["cipherText"], 16)
 s_c1 = encrypt.json()["parity"]
 s_c2 = encrypt.json()["jacobiSymbol"]
 print(A.extend_decrypt(s_y, s_c1, s_c2))
-if(A.extend_decrypt == m):
+if(A.extend_decrypt(s_y, s_c1, s_c2) == m):
     print("Success")
+
+sign = s.get(f"{url}sign?message={hex(m)[2:]}&type=BYTES")
+sign = int(sign.json()["signature"], 16)
+print(f"verify is {A.verify(sign, m, s_n)}")
+
+my_sign = A.sign(m)
+ver = s.get(f"{url}verify?message={hex(m)[2:]}&type=BYTES&signature={hex(my_sign)[2:]}&modulus={hex(A.n)[2:]}")
+print(ver.json()["verified"])
