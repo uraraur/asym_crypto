@@ -154,14 +154,14 @@ class User:
         for s in sol: 
             s_c1 = s % 2 
             s_c2 = int(jacobi_symbol(s, self.n) == 1)
-            if s_c1 == c1 & s_c2 == c2:
+            if (s_c1 == c1 and s_c2 == c2):
                 s = (s - self.b * pow(2, -1, self.n)) % self.n 
                 return unformat(self.n, s)
     
     def sign(self, m):
         while True:
             x = format(self.n, m)
-            if (jacobi_symbol(x, self.p) == jacobi_symbol(x, self.q) == 1) :
+            if (jacobi_symbol(x, self.p) == 1 and jacobi_symbol(x, self.q) == 1) :
                 break
         return sq_blum(x, self.p, self.q)[random.randint(0, 3)]
         
@@ -176,7 +176,6 @@ class User:
 url = 'http://asymcryptwebservice.appspot.com/rabin/'
 
 s = requests.Session()
-print(f"{url}serverKey?keySize={2 * l}")
 res = s.get(f"{url}serverKey?keySize={2 * l}")
 s_n = int(res.json()["modulus"], 16)
 s_b = int(res.json()["b"], 16)
@@ -186,22 +185,42 @@ m = 111
 my_encryp = A.extend_encrypt(m, s_n, s_b)
 decryption = s.get(f"{url}decrypt?cipherText={hex(my_encryp[0])[2:]}&expectedType=BYTES&parity={my_encryp[1]}&jacobiSymbol={my_encryp[2]}")
 decryption = decryption.json()["message"]
-print(decryption)
 if(int(decryption, 16) == m):
-    print("Success")
+    print("encryption is Successful")
 
 encrypt = s.get(f"{url}encrypt?modulus={hex(A.n)[2:]}&b={hex(A.b)[2:]}&message={hex(m)[2:]}&type=BYTES")
 s_y = int(encrypt.json()["cipherText"], 16)
 s_c1 = encrypt.json()["parity"]
 s_c2 = encrypt.json()["jacobiSymbol"]
-print(A.extend_decrypt(s_y, s_c1, s_c2))
-if(A.extend_decrypt(s_y, s_c1, s_c2) == m):
-    print("Success")
+my_decryp = A.extend_decrypt(s_y, s_c1, s_c2)
+if(my_decryp == m):
+    print("decryption is Successful")
 
 sign = s.get(f"{url}sign?message={hex(m)[2:]}&type=BYTES")
 sign = int(sign.json()["signature"], 16)
-print(f"verify is {A.verify(sign, m, s_n)}")
+print(f"signature is {A.verify(sign, m, s_n)}ful")
 
 my_sign = A.sign(m)
 ver = s.get(f"{url}verify?message={hex(m)[2:]}&type=BYTES&signature={hex(my_sign)[2:]}&modulus={hex(A.n)[2:]}")
+print(ver.json())
 print(ver.json()["verified"])
+
+#----------------------------------------ATtACK-----------------------------------------------------------
+
+session = requests.Session()
+server_atacker = session.get("http://asymcryptwebservice.appspot.com/znp/serverKey")
+serv_n = int(server_atacker.json()["modulus"], 16)
+
+i = 0
+while True:
+    i = i + 1
+    t = random.randint(0, serv_n)
+    y = pow(t, 2, serv_n)
+    root = session.get(f"http://asymcryptwebservice.appspot.com/znp/challenge?y={hex(y)[2:]}")
+    root = int(root.json()["root"], 16)
+    if (t != root or t!= -root):
+        d = gcd(t + root, serv_n)
+        if (d[0] == 1 or d[0] == serv_n):
+            continue
+        break
+print(f"Number or tries: {i}")
