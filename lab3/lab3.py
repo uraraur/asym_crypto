@@ -1,9 +1,12 @@
 import random
 import numpy as np  
 import math
-from sympy.ntheory import legendre_symbol 
+from sympy.ntheory import jacobi_symbol
+import requests
 
-k = 20 #miller rabin moment
+
+print("fsffwqaf")
+k = 10 #miller rabin moment
 l = 256 #довжина p ta q 
 
 def gcd(a, b): 
@@ -28,10 +31,10 @@ def bits_to_dec(a):
     return r
 
 def l20_gen(t):
-    seq = [0] * 8 * t
+    seq = [0] * t
     for i in range(20):
         seq[i] = np.random.randint(2)
-    for j in range(20, 8 * t):
+    for j in range(20, t):
         seq[j] = seq[j - 3] ^ seq[j - 5] ^ seq[j - 9] ^ seq[j - 20]
     return bits_to_dec(seq)
 
@@ -101,47 +104,98 @@ def generate_prime(n):
 
 def generate_blum(n):
     p = generate_prime(n)
-    if (p - 3) % 4 != 0:
+    while (p - 3) % 4 != 0:
         p = generate_prime(n)
     return p
 
 def sq_blum(y, p, q):
-    s1 = pow(y, (p + 1) / 4, p)
-    s2 = pow(y, (q + 1) / 4, q)
+    s1 = pow(y, (p + 1) // 4, p)
+    s2 = pow(y, (q + 1) // 4, q)
     d, u, v = gcd(p, q)
     return [(u * p * s2 + v * q * s1) % (p*q), (u * p * s2 - v * q * s1) % (p*q), (-u * p * s2 + v * q * s1) % (p*q), (-u * p * s2 - v * q * s1) % (p*q)]
 
 #--------------------------------------------------------------------------------------------------------------
-def reformat(n, m):
-    lenght = ceil(len(bin(n)) / 8)
-    if  ceil(len(bin(m)) / 8) < lenght - 10:
-        r = random.randint(1, 2**64)
-        return 255 * 2**(8 * (lenght - 2)) + m * 2**64 + r
-    return "too long m"
 
-def deformat(n, m):
-    
+def format(n, m):
+    return 255 * 2**(2 * l - 16) + m * 2**64 + random.randint(1, 2**64)
+
+def unformat(n, x):
+    return (x % (2**(2 * l - 16))) // (2**64)
 
 class User:
-    __p = generate_blum(l)
-    __q = generate_blum(l)
-    n = __p * __q
+    def __init__(self, l, b = 0):
+        self.p = generate_blum(l)
+        self.q = generate_blum(l)
+        self.n = self.p * self.q
+        self.b = random.randint(1, self.n)
 
-    def encrypt(m, n):
-        y = pow(m, 2, n)
-        c1 = m % 2 
-        c2 = int(jacobi_symbol(m, n) == 1)
+    def encrypt(self, m, n):
+        x = format(n, m)
+        y = pow(x, 2, n)
+        c1 = x % 2 
+        c2 = int(jacobi_symbol(x, n) == 1)
+        return (y, c1, c2)
+
+    def extend_encrypt(self, m, n, b):
+        x = format(n, m)
+        y = (x * (x + b)) % n 
+        c1 = ((x + b * pow(2, -1, n)) % n) % 2
+        c2 = int(jacobi_symbol(x + b * pow(2, -1, n), n) == 1)
         return (y, c1, c2)
 
     def decrypt(self, y, c1, c2):
-        sol = sq_blum(y, self.__p, self.__q)
+        sol = sq_blum(y, self.p, self.q)
         for s in sol: 
             s_c1 = s % 2 
-            s_c2 = int(jacobi_symbol(s, n) == 1)
+            s_c2 = int(jacobi_symbol(s, self.n) == 1)
             if s_c1 == c1 & s_c2 == c2:
-                return s
+                return unformat(self.n, s)
 
-
-
+    def extend_decrypt(self, y, c1, c2):
+        sol = sq_blum((y + pow(self.b, 2, self.n) * pow(2, -2, self.n)) % self.n, self.p, self.q)
+        for s in sol: 
+            s = (s - self.b * pow(2, -1, self.n)) % self.n 
+        for s in sol: 
+            s_c1 = s % 2 
+            s_c2 = int(jacobi_symbol(s, self.n) == 1)
+            if s_c1 == c1 & s_c2 == c2:
+                return unformat(self.n, s)
     
+    def sign(self, m):
+        x = format(self.n, m)
+        while (jacobi_symbol(x, self.p) != jacobi_symbol(x, self.q) != 1) :
+            x = format(self.n, m)    
+        return (m, sq_blum(x, self.p, self.q)[0])
         
+    def verify(self, s, m):
+        tx = pow(s, 2, self.n)
+        if unformat(self.n, tx) != m:
+            print(":(")
+        print("Success")
+    
+#--------------------------------------------------------------------------------------------
+
+url = 'http://asymcryptwebservice.appspot.com/rabin/'
+
+s = requests.Session()
+print(f"{url}serverKey?keySize={2 * l}")
+res = s.get(f"{url}serverKey?keySize={2 * l}")
+s_n = int(res.json()["modulus"], 16)
+s_b = int(res.json()["b"], 16)
+
+A = User(l)
+m = 111
+my_encryp = A.extend_encrypt(m, s_n, s_b)
+decryption = s.get(f"{url}decrypt?cipherText={hex(my_encryp[0])[2:]}&expectedType=BYTES&parity={my_encryp[1]}&jacobiSymbol={my_encryp[2]}")
+decryption = decryption.json()["message"]
+print(decryption)
+if(int(decryption, 16) == m):
+    print("Success")
+
+encrypt = s.get(f"{url}encrypt?modulus={hex(A.n)[2:]}&b={hex(A.b)[2:]}&message={hex(m)[2:]}&type=BYTES")
+s_y = int(encrypt.json()["cipherText"], 16)
+s_c1 = encrypt.json()["parity"]
+s_c2 = encrypt.json()["jacobiSymbol"]
+print(A.extend_decrypt(s_y, s_c1, s_c2))
+if(A.extend_decrypt == m):
+    print("Success")
