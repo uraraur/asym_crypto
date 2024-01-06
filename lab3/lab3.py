@@ -7,6 +7,18 @@ import requests
 k = 10 #miller rabin moment
 l = 256 #довжина p ta q 
 
+#------------------------------------------------------------------------------------------
+
+def str_to_bin(str):
+    res = ""
+    res = ''.join(format(ord(i), '08b') for i in str)
+    return int(res, 2)
+
+
+print(str_to_bin("Hel!"))
+
+#------------------------------------------------------------------------------------------
+
 def gcd(a, b): 
     r_0, r_1 = a, b 
     u_0, u_1 = 1, 0
@@ -114,10 +126,10 @@ def sq_blum(y, p, q):
 
 #--------------------------------------------------------------------------------------------------------------
 
-def format(n, m):
+def formate(n, m):
     return 255 * 2**(2 * l - 16) + m * 2**64 + random.randint(1, 2**64)
 
-def unformat(n, x):
+def unformate(n, x):
     return (x % (2**(2 * l - 16))) // (2**64)
 
 class User:
@@ -128,14 +140,14 @@ class User:
         self.b = random.randint(1, self.n)
 
     def encrypt(self, m, n):
-        x = format(n, m)
+        x = formate(n, m)
         y = pow(x, 2, n)
         c1 = x % 2 
         c2 = int(jacobi_symbol(x, n) == 1)
         return (y, c1, c2)
 
     def extend_encrypt(self, m, n, b):
-        x = format(n, m)
+        x = formate(n, m)
         y = (x * (x + b)) % n 
         c1 = ((x + b * pow(2, -1, n)) % n) % 2
         c2 = int(jacobi_symbol(x + b * pow(2, -1, n), n) == 1)
@@ -147,7 +159,7 @@ class User:
             s_c1 = s % 2 
             s_c2 = int(jacobi_symbol(s, self.n) == 1)
             if s_c1 == c1 & s_c2 == c2:
-                return unformat(self.n, s)
+                return unformate(self.n, s)
 
     def extend_decrypt(self, y, c1, c2):
         sol = sq_blum((y + pow(self.b, 2, self.n) * pow(4, -1, self.n)), self.p, self.q)
@@ -156,18 +168,18 @@ class User:
             s_c2 = int(jacobi_symbol(s, self.n) == 1)
             if (s_c1 == c1 and s_c2 == c2):
                 s = (s - self.b * pow(2, -1, self.n)) % self.n 
-                return unformat(self.n, s)
+                return unformate(self.n, s) + 1
     
     def sign(self, m):
         while True:
-            x = format(self.n, m)
+            x = formate(self.n, m)
             if (jacobi_symbol(x, self.p) == 1 and jacobi_symbol(x, self.q) == 1) :
                 break
         return sq_blum(x, self.p, self.q)[random.randint(0, 3)]
         
     def verify(self, s, m, n):
         tx = pow(s, 2, n)
-        if unformat(n, tx) != m:
+        if unformate(n, tx) != m:
             print(":(")
         return "Success"
     
@@ -181,7 +193,9 @@ s_n = int(res.json()["modulus"], 16)
 s_b = int(res.json()["b"], 16)
 
 A = User(l)
-m = 111
+
+sent = "Hello!"
+m = str_to_bin(sent)
 my_encryp = A.extend_encrypt(m, s_n, s_b)
 decryption = s.get(f"{url}decrypt?cipherText={hex(my_encryp[0])[2:]}&expectedType=BYTES&parity={my_encryp[1]}&jacobiSymbol={my_encryp[2]}")
 decryption = decryption.json()["message"]
@@ -203,7 +217,6 @@ print(f"signature is {A.verify(sign, m, s_n)}ful")
 my_sign = A.sign(m)
 ver = s.get(f"{url}verify?message={hex(m)[2:]}&type=BYTES&signature={hex(my_sign)[2:]}&modulus={hex(A.n)[2:]}")
 print(ver.json())
-print(ver.json()["verified"])
 
 #----------------------------------------ATtACK-----------------------------------------------------------
 
