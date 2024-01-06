@@ -190,10 +190,14 @@ s_n = int(res.json()["modulus"], 16)
 s_b = int(res.json()["b"], 16)
 
 A = User(l)
+print(f"p: {A.p}, q: {A.q}")
 
 sent = "Hello!"
 m = str_to_bin(sent)
+print(m)
+
 my_encryp = A.extend_encrypt(m, s_n, s_b)
+#print(f"Encryption: {my_encryp[0]}")
 decryption = s.get(f"{url}decrypt?cipherText={hex(my_encryp[0])[2:]}&expectedType=BYTES&parity={my_encryp[1]}&jacobiSymbol={my_encryp[2]}")
 decryption = decryption.json()["message"]
 if(int(decryption, 16) == m):
@@ -212,6 +216,7 @@ sign = int(sign.json()["signature"], 16)
 print(f"signature is {A.verify(sign, m, s_n)}ful")
 
 my_sign = A.sign(m)
+#print(f"Sign: {my_sign}")
 ver = s.get(f"{url}verify?message={hex(m)[2:]}&type=BYTES&signature={hex(my_sign)[2:]}&modulus={hex(A.n)[2:]}")
 print(ver.json())
 
@@ -220,6 +225,8 @@ print(ver.json())
 session = requests.Session()
 server_atacker = session.get("http://asymcryptwebservice.appspot.com/znp/serverKey")
 serv_n = int(server_atacker.json()["modulus"], 16)
+#print(serv_n)
+
 
 i = 0
 while True:
@@ -234,3 +241,4 @@ while True:
             continue
         break
 print(f"Number or tries: {i}")
+#print(f"p: {d[0]}, q: {serv_n // d[0]}")
