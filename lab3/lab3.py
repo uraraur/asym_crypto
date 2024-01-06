@@ -14,9 +14,6 @@ def str_to_bin(str):
     res = ''.join(format(ord(i), '08b') for i in str)
     return int(res, 2)
 
-
-print(str_to_bin("Hel!"))
-
 #------------------------------------------------------------------------------------------
 
 def gcd(a, b): 
@@ -168,7 +165,7 @@ class User:
             s_c2 = int(jacobi_symbol(s, self.n) == 1)
             if (s_c1 == c1 and s_c2 == c2):
                 s = (s - self.b * pow(2, -1, self.n)) % self.n 
-                return unformate(self.n, s) + 1
+                return unformate(self.n, s)
     
     def sign(self, m):
         while True:
